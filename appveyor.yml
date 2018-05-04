@@ -30,6 +30,9 @@ environment:
   - ONNX_ML: 1
     CONDA_PREFIX: C:\Miniconda35
 
+  - ONNX_ML: 1
+    CONDA_PREFIX: C:\Miniconda27-x64
+
 install:
 - cmd: git submodule update --init --recursive
 
