@@ -26,7 +26,7 @@ install:
 
 before_build:
 - cmd: SET PATH=%CONDA_PREFIX%;%CONDA_PREFIX%\Scripts;%PATH%
-- cmd: conda install -y -c conda-forge protobuf numpy
+- cmd: C:\Miniconda3-x64\conda install -y -c conda-forge protobuf numpy
 - cmd: pip install pytest-cov nbval
 
 build_script:
