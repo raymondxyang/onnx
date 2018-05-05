@@ -19,14 +19,14 @@ environment:
   matrix:
   # onnx-ml
   - ONNX_ML: 1
-    CONDA_PREFIX: C:\Miniconda-x64
+    CONDA_PREFIX: C:\Miniconda3-x64
 
 install:
 - cmd: git submodule update --init --recursive
 
 before_build:
-- cmd: SET PATH=%CONDA_PREFIX%;%CONDA_PREFIX%\Scripts;%PATH%
-- cmd: C:\Miniconda3-x64\Scripts\conda.exe install -y -c conda-forge protobuf numpy
+- cmd: SET PATH=C:\Python27-x64;%CONDA_PREFIX%;%CONDA_PREFIX%\Scripts;%PATH%
+- cmd: conda install -y -c conda-forge protobuf numpy
 - cmd: pip install pytest-cov nbval
 
 build_script:
