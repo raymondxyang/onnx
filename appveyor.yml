@@ -27,7 +27,8 @@ install:
 before_build:
 - cmd: SET PATH=C:\Python27-x64;%CONDA_PREFIX%;%CONDA_PREFIX%\Scripts;%PATH%
 - cmd: conda install -y -c conda-forge protobuf numpy
-- cmd: pip install pytest-cov nbval wheel
+- cmd: pip2.7 install --upgrade --user travis pip setuptools wheel virtualenv
+- cmd: pip install pytest-cov nbval
 
 build_script:
 # Build and test onnx.
