@@ -39,7 +39,7 @@ build_script:
 #- cmd: C:\Miniconda36\Scripts\backend-test-tools generate-data
 
 on_failure:
-- cmd: tree c:\projects\onnx\
+- cmd: tree .
 
 # add after_test commands to collect logs and such
 # add artifacts: -path to collect build artifacts
