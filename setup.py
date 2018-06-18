@@ -176,7 +176,10 @@ class cmake_build(setuptools.Command):
                     # TODO: need a better way to determine generator
                     cmake_args.append('-DCMAKE_GENERATOR_PLATFORM=x64')
             else:
-                cmake_args.append('''-fvisibility=hidden -D'PyMODINIT_FUNC=__attribute__((visibility("default"))) PyObject* ' ''')
+                if sys.version_info[0] <= 2:
+                    cmake_args.append('''-fvisibility=hidden -D'PyMODINIT_FUNC=__attribute__((visibility("default"))) void ' ''')
+                else:
+                    cmake_args.append('''-fvisibility=hidden -D'PyMODINIT_FUNC=__attribute__((visibility("default"))) PyObject* ' ''')
             if ONNX_ML:
                 cmake_args.append('-DONNX_ML=1')
             if ONNX_BUILD_TESTS:
