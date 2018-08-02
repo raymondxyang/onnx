@@ -104,4 +104,117 @@ FunctionBuilderRegistry& FunctionBuilderRegistry::OnnxInstance() {
   static FunctionBuilderRegistry func_builder_registry;
   return func_builder_registry;
 }
+
+std::string RenameTensorNode(
+  const std::string& func_name,
+  int counter,
+  const std::string& internal_name
+) {
+  std::string new_name =
+    "Func_" + func_name + "_" + std::to_string(counter) + "_" + internal_name;
+  return new_name;
+}
+
+void FunctionExpandHelper(
+  const FunctionProto& func,
+  const NodeProto& node,
+  int counter,
+  GraphProto& g
+) {
+  std::string function_name = func.name();
+  int version = (int)func.since_version();
+  std::unordered_map<std::string, std::string> input_names_map;
+  std::unordered_map<std::string, std::string> output_names_map;
+  std::unordered_map<std::string, AttributeProto> attr_map;
+
+  for (int idx = 0; idx < node.input_size(); ++idx) {
+    input_names_map[func.input()[idx]] = node.input()[idx];
+  }
+  for (int idx = 0; idx < node.output_size(); ++idx) {
+    output_names_map[func.output()[idx]] = node.output()[idx];
+  }
+
+  for (auto& attr : node.attribute()) {
+    attr_map[attr.name()] = attr;
+  }
+
+  for (auto& function_node : func.node()) {
+    NodeProto* new_node = g.add_node();
+    new_node->CopyFrom(function_node);
+    new_node->clear_input();
+    new_node->clear_output();
+    new_node->clear_attribute();
+    for (auto& input : function_node.input()) {
+      if (input_names_map.count(input)) {
+        new_node->add_input(input_names_map[input]);
+      }
+      else {
+        new_node->add_input(RenameTensorNode(func.name(), counter, input));
+      }
+    }
+    for (auto& output : function_node.output()) {
+      if (output_names_map.count(output)) {
+        new_node->add_output(output_names_map[output]);
+      }
+      else {
+        new_node->add_output(RenameTensorNode(func.name(), counter, output));
+      }
+    }
+    for (auto& attr : function_node.attribute()) {
+      AttributeProto* new_attr = new_node->add_attribute();
+      if (attr.has_ref_attr_name()) {
+        new_attr->CopyFrom(attr_map[attr.ref_attr_name()]);
+      }
+      else {
+        new_attr->CopyFrom(attr);
+      }
+    }
+  }
+}
+
+Status DecomposeGraph(ModelProto& input_model) {
+  auto g = input_model.graph();
+  const std::string& domain = input_model.has_domain() ? input_model.domain() : "";
+  GraphProto new_g = GraphProto(g);
+
+  const std::vector<OpSchema> op_schemas = OpSchemaRegistry::get_all_schemas();
+  std::unordered_set<std::string> registered_schemas;
+  for (const auto& op : op_schemas) {
+    registered_schemas.insert(op.Name());
+  }
+
+  std::multimap<std::string, std::unique_ptr<FunctionProto>> pfunction_map;
+  FunctionBuilderRegistry& function_registry =
+    FunctionBuilderRegistry::OnnxInstance();
+  Common::Status status =
+    function_registry.GetFunctions(domain, &pfunction_map);
+
+  new_g.clear_node();
+  std::unordered_map<std::string, int> func_counter;
+
+  for (int idx = 0; idx < g.node_size(); ++idx) {
+    auto& node = g.node()[idx];
+    if (registered_schemas.count(node.op_type())) {
+      auto temp_node = new_g.add_node();
+      temp_node->CopyFrom(node);
+    }
+    else if (!pfunction_map.count(node.op_type())) {
+      throw std::runtime_error(
+        "Failed to recognize op/function '" + node.op_type() +
+        "'!");
+    }
+    else {
+      func_counter.count(node.op_type()) ?
+        func_counter[node.op_type()]++ : func_counter[node.op_type()] = 0;
+      FunctionExpandHelper(*(pfunction_map.find(node.op_type())->second),
+        node,
+        func_counter[node.op_type()],
+        new_g
+      );
+    }
+  }
+  delete input_model.release_graph();
+  input_model.set_allocated_graph(new GraphProto(new_g));
+  return Status::OK();
+}
 } // namespace ONNX_NAMESPACE
