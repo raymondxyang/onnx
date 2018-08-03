@@ -124,10 +124,10 @@ void FunctionExpandHelper(
   std::unordered_map<std::string, AttributeProto> attr_map;
 
   for (int idx = 0; idx < node.input_size(); ++idx) {
-    input_names_map[func.input()[idx]] = node.input()[idx];
+    input_names_map[func.input().Get(idx)] = node.input().Get(idx);
   }
   for (int idx = 0; idx < node.output_size(); ++idx) {
-    output_names_map[func.output()[idx]] = node.output()[idx];
+    output_names_map[func.output().Get(idx)] = node.output().Get(idx);
   }
 
   for (auto& attr : node.attribute()) {
@@ -190,7 +190,7 @@ Status DecomposeGraph(
       function_list.begin(), function_list.end());
 
   for (int idx = 0; idx < g.node_size(); ++idx) {
-    auto& node = g.node()[idx];
+    auto& node = g.node().Get(idx);
     if (!function_set.count(node.op_type()) &&
         registered_schemas.count(node.op_type())) {
       auto temp_node = new_g.add_node();
