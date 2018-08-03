@@ -58,7 +58,9 @@ class FunctionBuilderRegistry {
       FunctionBuilderRegistry::OnnxInstance().Register(function_builder);
 
 // Method docomposing all functions in graph
-Status DecomposeGraph(ModelProto& input_model);
+Status DecomposeGraph(
+    ModelProto& input_model,
+    std::vector<std::string> function_list = {});
 
 // Example to register a function.
 // Common::Status BuildFc(std::unique_ptr<FunctionProto>* func_proto) {

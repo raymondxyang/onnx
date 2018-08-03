@@ -65,7 +65,8 @@ Status FunctionBuilderRegistry::GetFunctions(
         function_proto->since_version() < version_range.first) {
       fail_check("Invalid function version in '", function_proto->name(), "'");
     }
-    op_set.insert({func_builder.GetDomain(), (int)function_proto->since_version()});
+    op_set.insert(
+        {func_builder.GetDomain(), (int)function_proto->since_version()});
     ctx.set_opset_imports(op_set);
     ctx.set_is_main_graph(false);
     LexicalScopeContext lex_ctx;
@@ -106,22 +107,17 @@ FunctionBuilderRegistry& FunctionBuilderRegistry::OnnxInstance() {
 }
 
 std::string RenameTensorNode(
-  const std::string& func_name,
-  int counter,
-  const std::string& internal_name
-) {
-  std::string new_name =
-    "Func_" + func_name + "_" + std::to_string(counter) + "_" + internal_name;
+    const std::string& node_name,
+    const std::string& internal_name) {
+  std::string new_name = "Func_" + node_name + internal_name;
   return new_name;
 }
 
 void FunctionExpandHelper(
-  const FunctionProto& func,
-  const NodeProto& node,
-  int counter,
-  GraphProto& g
-) {
-  std::string function_name = func.name();
+    const FunctionProto& func,
+    const NodeProto& node,
+    GraphProto& g) {
+  std::string node_name = node.name();
   int version = (int)func.since_version();
   std::unordered_map<std::string, std::string> input_names_map;
   std::unordered_map<std::string, std::string> output_names_map;
@@ -147,34 +143,34 @@ void FunctionExpandHelper(
     for (auto& input : function_node.input()) {
       if (input_names_map.count(input)) {
         new_node->add_input(input_names_map[input]);
-      }
-      else {
-        new_node->add_input(RenameTensorNode(func.name(), counter, input));
+      } else {
+        new_node->add_input(RenameTensorNode(node_name, input));
       }
     }
     for (auto& output : function_node.output()) {
       if (output_names_map.count(output)) {
         new_node->add_output(output_names_map[output]);
-      }
-      else {
-        new_node->add_output(RenameTensorNode(func.name(), counter, output));
+      } else {
+        new_node->add_output(RenameTensorNode(node_name, output));
       }
     }
     for (auto& attr : function_node.attribute()) {
       AttributeProto* new_attr = new_node->add_attribute();
       if (attr.has_ref_attr_name()) {
         new_attr->CopyFrom(attr_map[attr.ref_attr_name()]);
-      }
-      else {
+      } else {
         new_attr->CopyFrom(attr);
       }
     }
   }
 }
 
-Status DecomposeGraph(ModelProto& input_model) {
+Status DecomposeGraph(
+    ModelProto& input_model,
+    std::vector<std::string> function_list) {
   auto g = input_model.graph();
-  const std::string& domain = input_model.has_domain() ? input_model.domain() : "";
+  const std::string& domain =
+      input_model.has_domain() ? input_model.domain() : "";
   GraphProto new_g = GraphProto(g);
 
   const std::vector<OpSchema> op_schemas = OpSchemaRegistry::get_all_schemas();
@@ -185,32 +181,26 @@ Status DecomposeGraph(ModelProto& input_model) {
 
   std::multimap<std::string, std::unique_ptr<FunctionProto>> pfunction_map;
   FunctionBuilderRegistry& function_registry =
-    FunctionBuilderRegistry::OnnxInstance();
+      FunctionBuilderRegistry::OnnxInstance();
   Common::Status status =
-    function_registry.GetFunctions(domain, &pfunction_map);
+      function_registry.GetFunctions(domain, &pfunction_map);
 
   new_g.clear_node();
-  std::unordered_map<std::string, int> func_counter;
+  std::unordered_set<std::string> function_set(
+      function_list.begin(), function_list.end());
 
   for (int idx = 0; idx < g.node_size(); ++idx) {
     auto& node = g.node()[idx];
-    if (registered_schemas.count(node.op_type())) {
+    if (!function_set.count(node.op_type()) &&
+        registered_schemas.count(node.op_type())) {
       auto temp_node = new_g.add_node();
       temp_node->CopyFrom(node);
-    }
-    else if (!pfunction_map.count(node.op_type())) {
+    } else if (!pfunction_map.count(node.op_type())) {
       throw std::runtime_error(
-        "Failed to recognize op/function '" + node.op_type() +
-        "'!");
-    }
-    else {
-      func_counter.count(node.op_type()) ?
-        func_counter[node.op_type()]++ : func_counter[node.op_type()] = 0;
-      FunctionExpandHelper(*(pfunction_map.find(node.op_type())->second),
-        node,
-        func_counter[node.op_type()],
-        new_g
-      );
+          "Failed to recognize op/function '" + node.op_type() + "'!");
+    } else {
+      FunctionExpandHelper(
+          *(pfunction_map.find(node.op_type())->second), node, new_g);
     }
   }
   delete input_model.release_graph();
