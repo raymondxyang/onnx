@@ -57,27 +57,13 @@ using TypeConstraintMap =
     std::unordered_map<std::string, std::pair<DataTypeSet, std::string>>;
 
 /**
- * @brief A class to record the schema of an op.
- *
- * OpSchema records the common interface of an op specified by its name.
- *
- * To register an OpSchema, one can use the macro ONNX_OPERATOR_SCHEMA(name) and
- * then append the various functions in the class. For example, for an op
- * that takes in two inputs, one output, and the first input and output
- * could be in-place, can be written as
- *
- *     ONNX_OPERATOR_SCHEMA(name)
- *         .NumInputs(2).NumOutputs(1).AllowConsumed({{0, 0}});
- *
- * To manufacture methods that may be used to register an OpSchema
- * non-statically, the following may be used:
- *
- *     ONNX_OPERATOR_SET_SCHEMA(name, version, OpSchema()
- *         .NumInputs(2).NumOutputs(1).AllowConsumed({{0, 0}}));
- */
-class OpSchema final {
- public:
-  // Formal parameter options.
+* @brief A abstract interface for OpSchema(ops) and function in graphs
+*
+* A common interface of an op/function specified by its name.
+*
+*/
+class IOpSchema {
+public:
   enum FormalParameterOption : uint8_t {
     // The input formal parameter is single and not optional.
     // Number of this input is 1.
@@ -93,22 +79,22 @@ class OpSchema final {
   // Formal parameter represenation, including input/output name, typeStr,
   // description, and type constraints.
   class FormalParameter final {
-   public:
+  public:
     // Constructor.
     FormalParameter() = default;
 
     explicit FormalParameter(
-        std::string name,
-        DataTypeSet type_set,
-        std::string type_str,
-        std::string description,
-        FormalParameterOption param_option = Single);
+      std::string name,
+      DataTypeSet type_set,
+      std::string type_str,
+      std::string description,
+      FormalParameterOption param_option = Single);
 
     explicit FormalParameter(
-        std::string name,
-        std::string description,
-        std::string type_str,
-        FormalParameterOption param_option = Single);
+      std::string name,
+      std::string description,
+      std::string type_str,
+      FormalParameterOption param_option = Single);
 
     // Get formal parameter name.
     const std::string& GetName() const;
@@ -125,11 +111,10 @@ class OpSchema final {
     // Get the parameter option, it could be Single, Optional or Variadic.
     FormalParameterOption GetOption() const;
 
-   private:
-    friend class OpSchema;
-
     DataTypeSet& MutableTypes();
 
+  private:
+    
     // Formal parameter name.
     std::string name_;
 
@@ -149,11 +134,79 @@ class OpSchema final {
     FormalParameterOption param_option_;
   };
 
-  enum class SupportType : uint8_t {
-    COMMON, // Supported by all frameworks that support this IR.
-    EXPERIMENTAL, // This OP is experimental and can be changed or removed in
-                  // the future.
+  struct Attribute final {
+    Attribute(
+      std::string name_,
+      std::string description_,
+      AttributeProto::AttributeType type_,
+      bool required_)
+      : name(std::move(name_)),
+      description(std::move(description_)),
+      type(type_),
+      required(required_),
+      default_value() {}
+
+    Attribute(
+      std::string name_,
+      std::string description_,
+      AttributeProto default_value_)
+      : name(std::move(name_)),
+      description(std::move(description_)),
+      type(default_value_.type()),
+      required(false),
+      default_value(std::move(default_value_)) {}
+
+    const std::string name;
+    const std::string description;
+    AttributeProto::AttributeType type;
+    bool required;
+    AttributeProto default_value;
   };
+
+  // Type constraint.
+  struct TypeConstraintParam final {
+    TypeConstraintParam(
+      std::string type_param_str_,
+      std::vector<std::string> allowed_type_strs_,
+      std::string description_)
+      : type_param_str(std::move(type_param_str_)),
+      allowed_type_strs(std::move(allowed_type_strs_)),
+      description(std::move(description_)) {}
+
+    // Type parameter string, for example, "T", "T1", etc.
+    std::string type_param_str;
+    // Allowed type strings for <*this> type parameter, for example,
+    // "tensor(float)".
+    std::vector<std::string> allowed_type_strs;
+    // Type parameter description.
+    std::string description;
+  };
+
+  virtual void Verify(const NodeProto& node) const = 0;
+};
+
+/**
+ * @brief A class to record the schema of an op.
+ *
+ * OpSchema records the common interface of an op specified by its name.
+ *
+ * To register an OpSchema, one can use the macro ONNX_OPERATOR_SCHEMA(name) and
+ * then append the various functions in the class. For example, for an op
+ * that takes in two inputs, one output, and the first input and output
+ * could be in-place, can be written as
+ *
+ *     ONNX_OPERATOR_SCHEMA(name)
+ *         .NumInputs(2).NumOutputs(1).AllowConsumed({{0, 0}});
+ *
+ * To manufacture methods that may be used to register an OpSchema
+ * non-statically, the following may be used:
+ *
+ *     ONNX_OPERATOR_SET_SCHEMA(name, version, OpSchema()
+ *         .NumInputs(2).NumOutputs(1).AllowConsumed({{0, 0}}));
+ */
+class OpSchema final : public IOpSchema {
+ public:
+  using IOpSchema::Verify;
 
   OpSchema() : OpSchema("unknown", "unknown", 0) {}
   OpSchema(std::string name, std::string file, int line)
@@ -176,6 +229,12 @@ class OpSchema final {
     return line_;
   }
 
+  enum class SupportType : uint8_t {
+    COMMON, // Supported by all frameworks that support this IR.
+    EXPERIMENTAL, // This OP is experimental and can be changed or removed in
+                  // the future.
+  };
+
   /**
    * @brief Returns the support level of the op schema.
    */
@@ -194,7 +253,7 @@ class OpSchema final {
    * @brief Verifies if a NodeProto matches the pattern specified in
    * the schema.
    */
-  void Verify(const NodeProto& node) const;
+  void Verify(const NodeProto& node) const final;
 
   // Functions to set the property of the operator schemas.
   // Sets the number of inputs, either a fixed number or a min and a max.
@@ -264,35 +323,6 @@ class OpSchema final {
   OpSchema& SetDomain(const char* domain);
   OpSchema& SetDomain(std::string domain);
 
-  struct Attribute final {
-    Attribute(
-        std::string name_,
-        std::string description_,
-        AttributeProto::AttributeType type_,
-        bool required_)
-        : name(std::move(name_)),
-          description(std::move(description_)),
-          type(type_),
-          required(required_),
-          default_value() {}
-
-    Attribute(
-        std::string name_,
-        std::string description_,
-        AttributeProto default_value_)
-        : name(std::move(name_)),
-          description(std::move(description_)),
-          type(default_value_.type()),
-          required(false),
-          default_value(std::move(default_value_)) {}
-
-    const std::string name;
-    const std::string description;
-    AttributeProto::AttributeType type;
-    bool required;
-    AttributeProto default_value;
-  };
-
   OpSchema& Attr(Attribute attr);
 
 // Register "optional" attribute with default value.
@@ -335,25 +365,6 @@ class OpSchema final {
       bool required = true);
 
   OpSchema& AllowUncheckedAttributes();
-
-  // Type constraint.
-  struct TypeConstraintParam final {
-    TypeConstraintParam(
-        std::string type_param_str_,
-        std::vector<std::string> allowed_type_strs_,
-        std::string description_)
-        : type_param_str(std::move(type_param_str_)),
-          allowed_type_strs(std::move(allowed_type_strs_)),
-          description(std::move(description_)) {}
-
-    // Type parameter string, for example, "T", "T1", etc.
-    std::string type_param_str;
-    // Allowed type strings for <*this> type parameter, for example,
-    // "tensor(float)".
-    std::vector<std::string> allowed_type_strs;
-    // Type parameter description.
-    std::string description;
-  };
 
   // Grammar for type strings used in Input(), Output().
   // <type> ::= <data_type> |
