@@ -121,7 +121,7 @@ void FunctionExpandHelper(
   int version = (int)func.since_version();
   std::unordered_map<std::string, std::string> input_names_map;
   std::unordered_map<std::string, std::string> output_names_map;
-  std::unordered_map<std::string, AttributeProto> attr_map;
+  std::unordered_map<std::string, const AttributeProto*> attr_map;
 
   for (int idx = 0; idx < node.input_size(); ++idx) {
     input_names_map[func.input().Get(idx)] = node.input().Get(idx);
@@ -131,7 +131,7 @@ void FunctionExpandHelper(
   }
 
   for (auto& attr : node.attribute()) {
-    attr_map[attr.name()] = attr;
+    attr_map[attr.name()] = &attr;
   }
 
   for (auto& function_node : func.node()) {
@@ -157,7 +157,7 @@ void FunctionExpandHelper(
     for (auto& attr : function_node.attribute()) {
       AttributeProto* new_attr = new_node->add_attribute();
       if (attr.has_ref_attr_name()) {
-        new_attr->CopyFrom(attr_map[attr.ref_attr_name()]);
+        new_attr->CopyFrom(*attr_map[attr.ref_attr_name()]);
       } else {
         new_attr->CopyFrom(attr);
       }
