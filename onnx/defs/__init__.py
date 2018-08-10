@@ -3,7 +3,9 @@ from __future__ import division
 from __future__ import print_function
 from __future__ import unicode_literals
 
+import onnx
 from onnx import AttributeProto, FunctionProto
+from onnx import ModelProto
 import onnx.onnx_cpp2py_export.defs as C
 
 from collections import defaultdict
@@ -45,3 +47,9 @@ def get_functions(domain=ONNX_DOMAIN):  # type: ignore
             function_proto.ParseFromString(function_bytes)
             function_map[function_name].append(function_proto)
     return function_map
+
+
+def decompose_functions(model, function_names=[]):  # type: (ModelProto, List[str]) -> ModelProto
+    model_str = model.SerializeToString()
+    decomposed_model_str = C.decompose(model_str, function_names)  # type: ignore
+    return onnx.load_from_string(decomposed_model_str)

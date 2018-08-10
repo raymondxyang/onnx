@@ -1,5 +1,6 @@
 #include "onnx/checker.h"
 #include "onnx/defs/schema.h"
+#include "onnx/defs/function.h"
 #include "onnx/proto_utils.h"
 #include "onnx/string_utils.h"
 
@@ -435,7 +436,9 @@ void check_function(
   }
 }
 
-void check_model(const ModelProto& model) {
+void check_model(const ModelProto& original_model) {
+  ModelProto model = ModelProto(original_model);
+  DecomposeGraph(model);
   if (!model.ir_version()) {
     fail_check("The model does not have an ir_version set properly.");
   }
