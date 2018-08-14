@@ -182,7 +182,10 @@ PYBIND11_MODULE(onnx_cpp2py_export, onnx_cpp2py_export) {
          const std::vector<std::string>& function_names) {
         ModelProto proto{};
         ParseProtoFromPyBytes(&proto, bytes);
-        DecomposeGraph(proto, function_names);
+        DecomposeGraph(
+          *proto.mutable_graph(), 
+          proto.has_domain()? proto.domain() : "",
+          function_names);
         std::string out;
         proto.SerializeToString(&out);
         return py::bytes(out);

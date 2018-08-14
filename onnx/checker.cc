@@ -250,7 +250,6 @@ void check_node(
     const CheckerContext& ctx,
     const LexicalScopeContext& lex_ctx) {
   enforce_non_empty_field(node, op_type);
-
   if (node.input().empty() && node.output().empty()) {
     fail_check(
         "NodeProto (name: ",
@@ -275,19 +274,38 @@ void check_node(
   const auto* schema = ctx.get_schema_registry()->GetSchema(
       node.op_type(), domain_version, node.domain());
   if (!schema) {
-    fail_check(
+    GraphProto g;
+    NodeProto temp_node = node;
+    NodeProto* ptemp_node = g.add_node();
+    ptemp_node = &temp_node;
+    
+    try {
+      DecomposeGraph(g, node.domain());
+      for (const NodeProto& node : g.node()) {
+        check_node(node, ctx, lex_ctx);
+      }
+      return;
+    }
+    catch (std::runtime_error e)
+    {
+      fail_check(
         "No Schema registered for " + node.op_type() +
         " with domain_version of " + ONNX_NAMESPACE::to_string(domain_version));
+    }   
   }
   schema->Verify(node);
 }
 
 void check_graph(
-    const GraphProto& graph,
+    const GraphProto& original_graph,
     const CheckerContext& ctx,
     const LexicalScopeContext& parent_lex) {
-  enforce_non_empty_field(graph, name);
-
+  GraphProto graph = GraphProto(original_graph);
+  if (!ctx.is_decomposed()) {
+    // temp fix
+    DecomposeGraph(graph, ctx.get_opset_imports().begin()->first);
+  }
+  enforce_non_empty_field(original_graph, name);
   for (const auto& value_info : graph.input()) {
     check_value_info(value_info, ctx);
   }
@@ -436,9 +454,7 @@ void check_function(
   }
 }
 
-void check_model(const ModelProto& original_model) {
-  ModelProto model = ModelProto(original_model);
-  DecomposeGraph(model);
+void check_model(const ModelProto& model) {
   if (!model.ir_version()) {
     fail_check("The model does not have an ir_version set properly.");
   }
@@ -475,7 +491,10 @@ void check_model(const ModelProto& original_model) {
   }
   ctx.set_opset_imports(opset_imports);
   LexicalScopeContext lex_ctx;
-  check_graph(model.graph(), ctx, lex_ctx);
+  GraphProto g = GraphProto(model.graph());
+  DecomposeGraph(g, model.domain());
+  ctx.set_is_decomposed(true);
+  check_graph(g, ctx, lex_ctx);
 }
 
 #undef fail_check

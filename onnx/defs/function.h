@@ -59,7 +59,8 @@ class FunctionBuilderRegistry {
 
 // Method docomposing all functions in graph
 Status DecomposeGraph(
-    ModelProto& input_model,
+    GraphProto& input_model,
+    const std::string& domain,
     std::vector<std::string> function_list = {});
 
 // Example to register a function.

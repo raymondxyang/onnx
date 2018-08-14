@@ -52,7 +52,12 @@ class CheckerContext final {
   void set_is_main_graph(bool is_main_graph) {
     is_main_graph_ = is_main_graph;
   }
-
+  bool is_decomposed() const {
+    return is_decomposed_;
+  }
+  void set_is_decomposed(bool is_decomposed) {
+    is_decomposed_ = is_decomposed;
+  }
   void set_schema_registry(const ISchemaRegistry* schema_registry) {
     schema_registry_ = schema_registry;
   }
@@ -67,6 +72,7 @@ class CheckerContext final {
   int ir_version_;
   std::unordered_map<std::string, int> opset_imports_;
   bool is_main_graph_ = true;
+  bool is_decomposed_ = false;
   const ISchemaRegistry* schema_registry_ = OpSchemaRegistry::Instance();
 };
 

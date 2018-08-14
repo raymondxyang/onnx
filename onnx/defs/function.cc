@@ -121,7 +121,7 @@ void FunctionExpandHelper(
   int version = (int)func.since_version();
   std::unordered_map<std::string, std::string> input_names_map;
   std::unordered_map<std::string, std::string> output_names_map;
-  std::unordered_map<std::string, const AttributeProto*> attr_map;
+  std::unordered_map<std::string, AttributeProto> attr_map;
 
   for (int idx = 0; idx < node.input_size(); ++idx) {
     input_names_map[func.input().Get(idx)] = node.input().Get(idx);
@@ -131,7 +131,7 @@ void FunctionExpandHelper(
   }
 
   for (auto& attr : node.attribute()) {
-    attr_map[attr.name()] = &attr;
+    attr_map[attr.name()] = attr;
   }
 
   for (auto& function_node : func.node()) {
@@ -155,10 +155,13 @@ void FunctionExpandHelper(
       }
     }
     for (auto& attr : function_node.attribute()) {
-      AttributeProto* new_attr = new_node->add_attribute();
       if (attr.has_ref_attr_name()) {
-        new_attr->CopyFrom(*attr_map[attr.ref_attr_name()]);
+        if (attr_map.count(attr.ref_attr_name())) {
+          AttributeProto* new_attr = new_node->add_attribute();
+          new_attr->CopyFrom(attr_map[attr.ref_attr_name()]);
+        }
       } else {
+        AttributeProto* new_attr = new_node->add_attribute();
         new_attr->CopyFrom(attr);
       }
     }
@@ -166,13 +169,10 @@ void FunctionExpandHelper(
 }
 
 Status DecomposeGraph(
-    ModelProto& input_model,
+    GraphProto& g,
+    const std::string& domain,
     std::vector<std::string> function_list) {
-  auto g = input_model.graph();
-  const std::string& domain =
-      input_model.has_domain() ? input_model.domain() : "";
   GraphProto new_g = GraphProto(g);
-
   const std::vector<OpSchema> op_schemas = OpSchemaRegistry::get_all_schemas();
   std::unordered_set<std::string> registered_schemas;
   for (const auto& op : op_schemas) {
@@ -203,8 +203,7 @@ Status DecomposeGraph(
           *(pfunction_map.find(node.op_type())->second), node, new_g);
     }
   }
-  delete input_model.release_graph();
-  input_model.set_allocated_graph(new GraphProto(new_g));
+  g.CopyFrom(new_g);
   return Status::OK();
 }
 } // namespace ONNX_NAMESPACE
