@@ -1,0 +1,49 @@
+# Python package
+# Create and test a Python package on multiple Python versions.
+# Add steps that analyze code, save the dist with the build record, publish to a PyPI-compatible index, and more:
+# https://docs.microsoft.com/azure/devops/pipelines/languages/python
+
+jobs:
+
+- job: 'ONNX'
+  pool:
+    vmImage: 'Ubuntu 16.04'
+  strategy:
+    matrix:
+      Python35:
+        python.version: '3.5'
+      Python36:
+        python.version: '3.6'
+      Python37:
+        python.version: '3.7'
+    maxParallel: 4
+
+  steps:
+  - task: UsePythonVersion@0
+    inputs:
+      versionSpec: '$(python.version)'
+      architecture: 'x64'
+
+  - script: conda install -y -c conda-forge protobuf=3.5.2 numpy
+    displayName: 'Install conda libraries'
+
+  - script: |
+      pip install pytest-cov nbval
+    displayName: 'Install pytest'
+
+  - script: |
+      git submodule update --init --recursive
+      set ONNX_BUILD_TESTS=1
+      set ONNX_ML=1
+      python setup.py bdist_wheel --universal --dist-dir .
+    displayName: 'Build package'
+
+  - script: |
+      dir /s /b /a-d "onnx_gtests.exe" >UT.txt & set /p _UT= < UT.txt & %_UT%
+      dir /b /a-d "*.whl" >WheelFile.txt & set /p _wheel= < WheelFile.txt
+      pip install %_wheel%
+      pytest
+      python onnx/defs/gen_doc.py
+      python onnx/gen_proto.py
+    displayName: 'Test package'
+    
