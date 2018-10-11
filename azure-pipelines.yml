@@ -24,9 +24,9 @@ jobs:
       versionSpec: '$(python.version)'
       architecture: 'x64'
   - task: CondaEnvironment@1
-  inputs:
-    environmentName: 'tempenv'
-    packageSpecs: 'python=$(python.version)'
+    inputs:
+      environmentName: 'tempenv'
+      packageSpecs: 'python=$(python.version)'
 
   - script: conda install -y -c conda-forge protobuf=3.5.2 numpy
     displayName: 'Install conda libraries'
