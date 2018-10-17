@@ -15,8 +15,6 @@ jobs:
       Python36:
         python.version: '3.6'
     maxParallel: 4
-  trigger:
-    batch: true
 
   steps:
   - task: UsePythonVersion@0
@@ -35,12 +33,12 @@ jobs:
       pip install pytest-cov nbval
     displayName: 'Install pytest'
 
-  - task: BatchScript@4
+  - task: BatchScript@1
     inputs:
       filename: .azure-pipelines/install.bat
       workingFolder: "$(Build.SourcesDirectory)"
 
-  - task: BatchScript@5
+  - task: BatchScript@1
     inputs:
       filename: .azure-pipelines/test.bat
       workingFolder: "$(Build.SourcesDirectory)"
