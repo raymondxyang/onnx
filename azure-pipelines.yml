@@ -14,8 +14,6 @@ jobs:
         python.version: '3.5'
       Python36:
         python.version: '3.6'
-      Python37:
-        python.version: '3.7'
     maxParallel: 4
 
   steps:
@@ -35,19 +33,13 @@ jobs:
       pip install pytest-cov nbval
     displayName: 'Install pytest'
 
-  - script: |
-      git submodule update --init --recursive
-      set ONNX_BUILD_TESTS=1
-      set ONNX_ML=1
-      python setup.py bdist_wheel --universal --dist-dir .
+  - task: BatchScript@1
+    inputs:
+      filename: .azure-pipelines/install.bat
     displayName: 'Build package'
 
-  - script: |
-      dir /s /b /a-d "onnx_gtests.exe" >UT.txt & set /p _UT= < UT.txt & %_UT%
-      dir /b /a-d "*.whl" >WheelFile.txt & set /p _wheel= < WheelFile.txt
-      pip install %_wheel%
-      pytest
-      python onnx/defs/gen_doc.py
-      python onnx/gen_proto.py
+  - task: BatchScript@2
+    inputs:
+      filename: .azure-pipelines/test.bat
     displayName: 'Test package'
     
