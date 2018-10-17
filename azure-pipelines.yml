@@ -33,13 +33,15 @@ jobs:
       pip install pytest-cov nbval
     displayName: 'Install pytest'
 
-  - task: BatchScript@1
+  - task: BatchScript@4
     inputs:
       filename: .azure-pipelines/install.bat
+      workingFolder: "$(Build.SourcesDirectory)"
     displayName: 'Build package'
 
-  - task: BatchScript@2
+  - task: BatchScript@5
     inputs:
       filename: .azure-pipelines/test.bat
+      workingFolder: "$(Build.SourcesDirectory)"
     displayName: 'Test package'
     
