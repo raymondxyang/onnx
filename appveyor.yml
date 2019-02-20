@@ -26,6 +26,10 @@ environment:
 
   - CONDA_PREFIX: C:\Miniconda35
 
+  - CONDA_PREFIX: C:\Miniconda37-x64
+
+  - CONDA_PREFIX: C:\Miniconda37
+
 install:
 - cmd: git submodule update --init --recursive
 
